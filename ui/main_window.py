@@ -67,6 +67,40 @@ class MainWindow(QMainWindow):
                 border: none;
                 background: transparent;
             }}
+            /* 彻底消除任何底部横向滚动条，保证视觉极其纯净 */
+            QScrollBar:horizontal {{
+                height: 0px !important;
+                border: none !important;
+                background: transparent !important;
+            }}
+            QScrollBar::handle:horizontal, QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal,
+            QScrollBar::add-page:horizontal, QScrollBar::sub-page:horizontal {{
+                width: 0px !important;
+                height: 0px !important;
+                border: none !important;
+                background: transparent !important;
+            }}
+            /* 极简轻量 macOS 悬浮式垂直细滚动条 */
+            QScrollBar:vertical {{
+                width: 6px;
+                background: transparent;
+                margin: 0px;
+                border: none;
+            }}
+            QScrollBar::handle:vertical {{
+                background: rgba(160, 165, 175, 0.35);
+                min-height: 28px;
+                border-radius: 3px;
+            }}
+            QScrollBar::handle:vertical:hover {{
+                background: rgba(124, 58, 237, 0.6);
+            }}
+            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical,
+            QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{
+                background: transparent;
+                border: none;
+                height: 0px;
+            }}
         """)
 
         self.growth_items: List[GrowthItem] = [
@@ -283,6 +317,7 @@ class MainWindow(QMainWindow):
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setFrameShape(QFrame.NoFrame)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         scroll.setStyleSheet(f"""
             QScrollArea, QScrollArea > QWidget, QScrollArea > QWidget > QWidget {{
                 background-color: {THEME.BG_CANVAS};
@@ -680,6 +715,7 @@ class MainWindow(QMainWindow):
         self.table.verticalHeader().setVisible(False)
         self.table.setShowGrid(False)
         self.table.setAlternatingRowColors(True)
+        self.table.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.table.setStyleSheet(f"""
             QTableWidget {{
                 background-color: #FFFFFF;
@@ -738,6 +774,7 @@ class MainWindow(QMainWindow):
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setFrameShape(QFrame.NoFrame)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
 
         content = QWidget()
         layout = QVBoxLayout(content)
@@ -829,6 +866,7 @@ class MainWindow(QMainWindow):
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setFrameShape(QFrame.NoFrame)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
 
         content = QWidget()
         layout = QVBoxLayout(content)
@@ -940,6 +978,7 @@ class MainWindow(QMainWindow):
         self.table_inspection.verticalHeader().setVisible(False)
         self.table_inspection.setShowGrid(False)
         self.table_inspection.setAlternatingRowColors(True)
+        self.table_inspection.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.table_inspection.setStyleSheet(f"""
             QTableWidget {{
                 background-color: #FFFFFF;
@@ -1106,6 +1145,7 @@ class MainWindow(QMainWindow):
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setFrameShape(QFrame.NoFrame)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
 
         content = QWidget()
         layout = QVBoxLayout(content)
@@ -1278,6 +1318,7 @@ class MainWindow(QMainWindow):
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setFrameShape(QFrame.NoFrame)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
 
         content = QWidget()
         layout = QVBoxLayout(content)
@@ -1718,9 +1759,15 @@ class MainWindow(QMainWindow):
             t_row.addStretch()
             info_v.addLayout(t_row)
 
-            d = QLabel(f"{it.description} (路径: {it.path})")
-            d.setStyleSheet(f"color: {THEME.TEXT_MUTED}; font-size: 11px;")
-            info_v.addWidget(d)
+            lbl_d = QLabel(it.description)
+            lbl_d.setStyleSheet(f"color: {THEME.TEXT_MUTED}; font-size: 11px;")
+            lbl_d.setWordWrap(True)
+            info_v.addWidget(lbl_d)
+
+            lbl_p = QLabel(f"路径: {it.path}")
+            lbl_p.setStyleSheet(f"color: {THEME.TEXT_HINT}; font-size: 10px; font-family: 'Geist Mono';")
+            lbl_p.setWordWrap(True)
+            info_v.addWidget(lbl_p)
             c_l.addLayout(info_v, 1)
 
             # 大小
