@@ -29,9 +29,9 @@ def main():
         }
     """)
 
-    # 全局字体排版系统：优先系统原生高精无衬线（macOS SF Pro / PingFang SC）
-    font = QFont()
-    font.setFamilies(["SF Pro Text", "-apple-system", "PingFang SC", "Geist", "Noto Sans SC", "Segoe UI", "sans-serif"])
+    # 全局字体排版系统：优先 macOS 系统原生无衬线（.AppleSystemUIFont / SF Pro）
+    font = QFont(".AppleSystemUIFont")
+    font.setFamilies([".AppleSystemUIFont", "SF Pro Text", "-apple-system", "PingFang SC", "Helvetica Neue", "Arial", "sans-serif"])
     font.setPixelSize(13)
     app.setFont(font)
 
@@ -39,7 +39,15 @@ def main():
     window = MainWindow()
     window.show()
 
-    sys.exit(app.exec())
+    exit_code = app.exec()
+    if hasattr(window, "worker") and window.worker and window.worker.isRunning():
+        try:
+            window.worker.cancel()
+            window.worker.terminate()
+            window.worker.wait(200)
+        except Exception:
+            pass
+    sys.exit(exit_code)
 
 if __name__ == "__main__":
     main()

@@ -4,6 +4,7 @@
 from __future__ import annotations
 import os
 import sys
+import time
 import subprocess
 from dataclasses import dataclass
 from typing import List, Dict, Any, Tuple
@@ -47,30 +48,45 @@ class DiskSensor:
             mount_point="/"
         )
 
-    @staticmethod
-    def get_real_directory_size(path: str) -> int:
-        """快速且100%真实计算目录大小 (在 macOS 上优先使用高性能 du -sk)"""
+    _DIR_SIZE_CACHE: Dict[str, Tuple[float, int]] = {}
+
+    @classmethod
+    def get_real_directory_size(cls, path: str) -> int:
+        """快速且100%真实计算目录大小 (macOS 下使用原生 du -sk + 智能短期缓存，杜绝深度扫描卡死)"""
         expanded = os.path.expanduser(path)
         if not os.path.exists(expanded):
             return 0
 
+        now = time.time()
+        if expanded in cls._DIR_SIZE_CACHE:
+            ts, sz = cls._DIR_SIZE_CACHE[expanded]
+            if now - ts < 120:  # 2分钟内直接复用真实测量值，避免频繁唤醒磁盘 I/O
+                return sz
+
         if sys.platform == "darwin":
             try:
-                res = subprocess.run(["du", "-sk", expanded], capture_output=True, text=True, timeout=3)
+                res = subprocess.run(["du", "-sk", expanded], capture_output=True, text=True, timeout=12)
                 if res.returncode == 0 and res.stdout:
                     kb_str = res.stdout.strip().split()[0]
-                    return int(kb_str) * 1024
+                    sz = int(kb_str) * 1024
+                    cls._DIR_SIZE_CACHE[expanded] = (now, sz)
+                    return sz
             except Exception:
                 pass
 
+        # 若 du 失败或超时，优先返回历史缓存
+        if expanded in cls._DIR_SIZE_CACHE:
+            return cls._DIR_SIZE_CACHE[expanded][1]
+
+        # 降级：仅对浅层做轻量统计，杜绝深层递归卡死
         total = 0
         try:
-            for root, dirs, files in os.walk(expanded):
-                for f in files:
-                    fp = os.path.join(root, f)
+            with os.scandir(expanded) as it:
+                for entry in it:
                     try:
-                        total += os.path.getsize(fp)
-                    except (OSError, FileNotFoundError):
+                        if entry.is_file(follow_symlinks=False):
+                            total += entry.stat().st_size
+                    except OSError:
                         pass
         except Exception:
             pass

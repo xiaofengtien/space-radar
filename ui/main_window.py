@@ -34,20 +34,39 @@ from core.cleaner import SafeCleaner
 from core.classifier import GrowthItem, SafetyLevel, TimeGrowthEvent
 from core.config import ConfigManager
 
+_ACTIVE_WORKERS = set()
+
 class ScannerWorker(QThread):
-    """真实后台异步扫描线程：两阶段极速吐出，时间点秒级呈现"""
+    """真实后台异步扫描线程：两阶段极速吐出，时间点秒级呈现，支持安全随时取消"""
     time_events_ready = Signal(list)
     finished_scan = Signal(list, list, object)
 
-    def run(self):
-        vol = DiskSensor.get_root_volume_info()
-        # 阶段 1: 优先秒级抓取真实时间点写入事件
-        time_events = DiskSensor.scan_all_time_point_events()
-        self.time_events_ready.emit(time_events)
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._is_cancelled = False
 
-        # 阶段 2: 深度汇总总卷大目录占用 (du -sk)
-        items = DiskSensor.scan_all_growth_items()
-        self.finished_scan.emit(items, time_events, vol)
+    def cancel(self):
+        self._is_cancelled = True
+
+    def run(self):
+        try:
+            if self._is_cancelled:
+                return
+            vol = DiskSensor.get_root_volume_info()
+            if self._is_cancelled:
+                return
+            time_events = DiskSensor.scan_all_time_point_events()
+            if self._is_cancelled:
+                return
+            self.time_events_ready.emit(time_events)
+            if self._is_cancelled:
+                return
+            items = DiskSensor.scan_all_growth_items()
+            if self._is_cancelled:
+                return
+            self.finished_scan.emit(items, time_events, vol)
+        except Exception:
+            pass
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -179,6 +198,7 @@ class MainWindow(QMainWindow):
         self.current_time_filter: str = "all"
         self.volume_info: Optional[DiskVolumeInfo] = None
         self.last_free_gb: Optional[float] = None
+        self.worker: Optional[ScannerWorker] = None
 
         # 巡检记录与定时器状态
         cfg = ConfigManager.load()
@@ -291,7 +311,7 @@ class MainWindow(QMainWindow):
         layout.addWidget(b_box)
 
         lbl_b_name = QLabel(f"{BRAND.NAME} · {BRAND.NAME_CN}")
-        lbl_b_name.setFont(QFont("Geist", 10, QFont.DemiBold))
+        lbl_b_name.setFont(QFont(".AppleSystemUIFont", 10, QFont.DemiBold))
         lbl_b_name.setStyleSheet(f"color: {THEME.TEXT_MAIN};")
         layout.addWidget(lbl_b_name)
 
@@ -378,7 +398,7 @@ class MainWindow(QMainWindow):
         t_row = QHBoxLayout()
         t_row.setSpacing(8)
         lbl_hero_title = QLabel(BRAND.NAME_CN)
-        lbl_hero_title.setFont(QFont("Geist", 24, QFont.Bold))
+        lbl_hero_title.setFont(QFont(".AppleSystemUIFont", 24, QFont.Bold))
         lbl_hero_title.setStyleSheet(f"color: {THEME.TEXT_MAIN};")
 
         tag_live = QLabel("时间点归因版")
@@ -389,7 +409,7 @@ class MainWindow(QMainWindow):
         left_col.addLayout(t_row)
 
         lbl_hero_desc = QLabel("不仅告诉你谁占地方，更精确告诉你【在什么具体时间点发生的增长】，按分钟/小时清晰追溯，一键安全释放。")
-        lbl_hero_desc.setFont(QFont("Geist", 11))
+        lbl_hero_desc.setFont(QFont(".AppleSystemUIFont", 11))
         lbl_hero_desc.setStyleSheet(f"color: {THEME.TEXT_MUTED}; line-height: 1.5;")
         lbl_hero_desc.setWordWrap(True)
         left_col.addWidget(lbl_hero_desc)
@@ -424,7 +444,7 @@ class MainWindow(QMainWindow):
         lbl1_sub = QLabel("当前剩余可用空间")
         lbl1_sub.setStyleSheet(f"color: {THEME.TEXT_MUTED}; font-size: 11px;")
         self.lbl_metric_free = QLabel("400.0 GB")
-        self.lbl_metric_free.setStyleSheet(f"color: {THEME.TEXT_MAIN}; font-size: 21px; font-weight: bold; font-family: 'Geist Mono';")
+        self.lbl_metric_free.setStyleSheet(f"color: {THEME.TEXT_MAIN}; font-size: 21px; font-weight: bold; font-family: Menlo;")
         self.lbl_metric_free_sub = QLabel("总容量 926.3 GB · 空闲 43.2%")
         self.lbl_metric_free_sub.setStyleSheet("color: #10B981; font-size: 11px; font-weight: 500;")
         l1.addWidget(lbl1_sub)
@@ -439,7 +459,7 @@ class MainWindow(QMainWindow):
         lbl2_sub = QLabel("最近一次突发增长")
         lbl2_sub.setStyleSheet(f"color: {THEME.TEXT_MUTED}; font-size: 11px;")
         self.lbl_metric_recent_size = QLabel("+507.9 MB")
-        self.lbl_metric_recent_size.setStyleSheet("color: #DC2626; font-size: 21px; font-weight: bold; font-family: 'Geist Mono';")
+        self.lbl_metric_recent_size.setStyleSheet("color: #DC2626; font-size: 21px; font-weight: bold; font-family: Menlo;")
         self.lbl_metric_recent_time = QLabel("刚刚 18:17:42 · 工具缓存")
         self.lbl_metric_recent_time.setStyleSheet("color: #DC2626; font-size: 11px; font-weight: bold;")
         l2.addWidget(lbl2_sub)
@@ -469,7 +489,7 @@ class MainWindow(QMainWindow):
         lbl4_sub = QLabel("绿色安全可释放")
         lbl4_sub.setStyleSheet(f"color: {THEME.TEXT_MUTED}; font-size: 11px;")
         self.lbl_metric_clean = QLabel("22.3 GB")
-        self.lbl_metric_clean.setStyleSheet("color: #059669; font-size: 21px; font-weight: bold; font-family: 'Geist Mono';")
+        self.lbl_metric_clean.setStyleSheet("color: #059669; font-size: 21px; font-weight: bold; font-family: Menlo;")
         lbl4_status = QLabel("含微信缓存、剪映渲染与临时包")
         lbl4_status.setStyleSheet("color: #059669; font-size: 11px;")
         l4.addWidget(lbl4_sub)
@@ -489,7 +509,7 @@ class MainWindow(QMainWindow):
         lbl_title = QLabel("系统卷容量分布管线 (真实占比)")
         lbl_title.setStyleSheet(f"color: {THEME.TEXT_MAIN}; font-size: 12px; font-weight: bold;")
         self.lbl_pipe_detail = QLabel("Macintosh HD · 总计 926.3 GB")
-        self.lbl_pipe_detail.setStyleSheet(f"color: {THEME.TEXT_MUTED}; font-size: 11px; font-family: 'Geist Mono';")
+        self.lbl_pipe_detail.setStyleSheet(f"color: {THEME.TEXT_MUTED}; font-size: 11px; font-family: Menlo;")
         top_h.addWidget(lbl_title)
         top_h.addStretch()
         top_h.addWidget(self.lbl_pipe_detail)
@@ -597,7 +617,7 @@ class MainWindow(QMainWindow):
         h_row.addWidget(dot)
 
         lbl_sec = QLabel("待处理重点占用")
-        lbl_sec.setFont(QFont("Geist", 12, QFont.Bold))
+        lbl_sec.setFont(QFont(".AppleSystemUIFont", 12, QFont.Bold))
         lbl_sec.setStyleSheet(f"color: {THEME.TEXT_MAIN};")
         h_row.addWidget(lbl_sec)
 
@@ -649,7 +669,7 @@ class MainWindow(QMainWindow):
         top_h = QHBoxLayout()
         v = QVBoxLayout()
         t = QLabel("⏱ 磁盘增长时间点追溯大厅")
-        t.setFont(QFont("Geist", 16, QFont.Bold))
+        t.setFont(QFont(".AppleSystemUIFont", 16, QFont.Bold))
         t.setStyleSheet(f"color: {THEME.TEXT_MAIN};")
         self.lbl_time_subtitle = QLabel("精确记录每一个大文件【具体是在什么时间点写入的】，彻底弄清何时暴涨")
         self.lbl_time_subtitle.setStyleSheet(f"color: {THEME.TEXT_MUTED}; font-size: 11px;")
@@ -804,7 +824,7 @@ class MainWindow(QMainWindow):
         left_v.addWidget(lbl_hc_tag)
 
         self.lbl_clean_total_headline = QLabel("可安全释放 22.3 GB 磁盘冗余")
-        self.lbl_clean_total_headline.setFont(QFont("Geist", 20, QFont.Bold))
+        self.lbl_clean_total_headline.setFont(QFont(".AppleSystemUIFont", 20, QFont.Bold))
         self.lbl_clean_total_headline.setStyleSheet("color: #111318;")
         left_v.addWidget(self.lbl_clean_total_headline)
 
@@ -843,7 +863,7 @@ class MainWindow(QMainWindow):
         # 2. 分类清理卡片清单
         sec_h = QHBoxLayout()
         lbl_sec_clean = QLabel("可清理缓存分类与白名单明细")
-        lbl_sec_clean.setFont(QFont("Geist", 13, QFont.Bold))
+        lbl_sec_clean.setFont(QFont(".AppleSystemUIFont", 13, QFont.Bold))
         lbl_sec_clean.setStyleSheet(f"color: {THEME.TEXT_MAIN};")
         sec_h.addWidget(lbl_sec_clean)
         sec_h.addStretch()
@@ -896,8 +916,8 @@ class MainWindow(QMainWindow):
         v_st.addLayout(st_badge_row)
 
         self.lbl_inspect_countdown = QLabel("距离下次自动巡检还有: 04:58")
-        self.lbl_inspect_countdown.setFont(QFont("Geist", 18, QFont.Bold))
-        self.lbl_inspect_countdown.setStyleSheet("color: #111318; font-family: 'Geist Mono';")
+        self.lbl_inspect_countdown.setFont(QFont(".AppleSystemUIFont", 18, QFont.Bold))
+        self.lbl_inspect_countdown.setStyleSheet("color: #111318; font-family: Menlo;")
         v_st.addWidget(self.lbl_inspect_countdown)
 
         lbl_desc = QLabel("空间雷达在后台持续静默检测 APFS 卷写事件，一旦发现单小时写入激增自动记录并告警。")
@@ -921,7 +941,7 @@ class MainWindow(QMainWindow):
 
         fc_top = QHBoxLayout()
         lbl_freq_t = QLabel("巡检频率设定 (Sampling Frequency)")
-        lbl_freq_t.setFont(QFont("Geist", 12, QFont.Bold))
+        lbl_freq_t.setFont(QFont(".AppleSystemUIFont", 12, QFont.Bold))
         lbl_freq_t.setStyleSheet(f"color: {THEME.TEXT_MAIN};")
         fc_top.addWidget(lbl_freq_t)
         fc_top.addStretch()
@@ -960,7 +980,7 @@ class MainWindow(QMainWindow):
 
         # 3. 历史巡检记录与容量变化轨迹
         lbl_hist_t = QLabel("历史巡检记录与容量变化轨迹 (Inspection Logs)")
-        lbl_hist_t.setFont(QFont("Geist", 13, QFont.Bold))
+        lbl_hist_t.setFont(QFont(".AppleSystemUIFont", 13, QFont.Bold))
         lbl_hist_t.setStyleSheet(f"color: {THEME.TEXT_MAIN};")
         layout.addWidget(lbl_hist_t)
 
@@ -1104,13 +1124,13 @@ class MainWindow(QMainWindow):
             # 时间
             t_item = QTableWidgetItem(rec["time"])
             t_item.setTextAlignment(Qt.AlignCenter)
-            t_item.setFont(QFont("Geist Mono", 10, QFont.Bold))
+            t_item.setFont(QFont("Menlo", 10, QFont.Bold))
             self.table_inspection.setItem(row, 0, t_item)
 
             # 剩余空间
             f_item = QTableWidgetItem(rec["free_str"])
             f_item.setTextAlignment(Qt.AlignCenter)
-            f_item.setFont(QFont("Geist Mono", 10, QFont.Bold))
+            f_item.setFont(QFont("Menlo", 10, QFont.Bold))
             self.table_inspection.setItem(row, 1, f_item)
 
             # 变动
@@ -1135,7 +1155,7 @@ class MainWindow(QMainWindow):
             # 耗时
             cost_item = QTableWidgetItem(rec["duration"])
             cost_item.setTextAlignment(Qt.AlignCenter)
-            cost_item.setFont(QFont("Geist Mono", 10))
+            cost_item.setFont(QFont("Menlo", 10))
             self.table_inspection.setItem(row, 5, cost_item)
 
             self.table_inspection.setRowHeight(row, 38)
@@ -1161,7 +1181,7 @@ class MainWindow(QMainWindow):
         rv = QVBoxLayout()
         rv.setSpacing(4)
         rt = QLabel("🛡 智能清理规则中心 (Cleanup Rules Engine)")
-        rt.setFont(QFont("Geist", 15, QFont.Bold))
+        rt.setFont(QFont(".AppleSystemUIFont", 15, QFont.Bold))
         rt.setStyleSheet(f"color: {THEME.TEXT_MAIN};")
         
         rd = QLabel("严格安全白名单机制：每一条规则均经过针对性保护设计，绝不损坏聊天记录、源码与原片工程。")
@@ -1250,7 +1270,7 @@ class MainWindow(QMainWindow):
 
             t_row = QHBoxLayout()
             lbl_t = QLabel(title)
-            lbl_t.setFont(QFont("Geist", 13, QFont.Bold))
+            lbl_t.setFont(QFont(".AppleSystemUIFont", 13, QFont.Bold))
             lbl_t.setStyleSheet(f"color: {THEME.TEXT_MAIN};")
             t_row.addWidget(lbl_t)
 
@@ -1272,7 +1292,7 @@ class MainWindow(QMainWindow):
             info_v.addWidget(lbl_p)
 
             lbl_pth = QLabel(f"监控路径: {path_str}")
-            lbl_pth.setStyleSheet(f"color: {THEME.TEXT_MUTED}; font-size: 10px; font-family: 'Geist Mono';")
+            lbl_pth.setStyleSheet(f"color: {THEME.TEXT_MUTED}; font-size: 10px; font-family: Menlo;")
             info_v.addWidget(lbl_pth)
 
             rl.addLayout(info_v, 1)
@@ -1335,7 +1355,7 @@ class MainWindow(QMainWindow):
         v = QVBoxLayout()
         v.setSpacing(4)
         lbl_c_t = QLabel("📁 自定义常驻监控目录 (Custom Monitored Directories)")
-        lbl_c_t.setFont(QFont("Geist", 15, QFont.Bold))
+        lbl_c_t.setFont(QFont(".AppleSystemUIFont", 15, QFont.Bold))
         lbl_c_t.setStyleSheet(f"color: {THEME.TEXT_MAIN};")
         
         lbl_c_d = QLabel("将您存放视频素材的外置移动硬盘、本地项目目录或临时文件夹加入监控，雷达将精确记录其时间点写入与体积变动。")
@@ -1363,7 +1383,7 @@ class MainWindow(QMainWindow):
         pc_layout.setSpacing(12)
 
         lbl_p_t = QLabel("⚙️ 监控与突发激增偏好 (Surge Thresholds)")
-        lbl_p_t.setFont(QFont("Geist", 13, QFont.Bold))
+        lbl_p_t.setFont(QFont(".AppleSystemUIFont", 13, QFont.Bold))
         lbl_p_t.setStyleSheet(f"color: {THEME.TEXT_MAIN};")
         pc_layout.addWidget(lbl_p_t)
 
@@ -1396,7 +1416,7 @@ class MainWindow(QMainWindow):
         ac_layout.setSpacing(8)
 
         lbl_ab_t = QLabel(f"关于 {BRAND.NAME} · {BRAND.NAME_CN}")
-        lbl_ab_t.setFont(QFont("Geist", 13, QFont.Bold))
+        lbl_ab_t.setFont(QFont(".AppleSystemUIFont", 13, QFont.Bold))
         lbl_ab_t.setStyleSheet(f"color: {THEME.TEXT_MAIN};")
         ac_layout.addWidget(lbl_ab_t)
 
@@ -1496,7 +1516,7 @@ class MainWindow(QMainWindow):
             lbl_fn.setStyleSheet(f"color: {THEME.TEXT_MAIN}; font-weight: bold; font-size: 12px;")
             
             lbl_fp = QLabel(d)
-            lbl_fp.setStyleSheet(f"color: {THEME.TEXT_MUTED}; font-size: 10px; font-family: 'Geist Mono';")
+            lbl_fp.setStyleSheet(f"color: {THEME.TEXT_MUTED}; font-size: 10px; font-family: Menlo;")
             v_info.addWidget(lbl_fn)
             v_info.addWidget(lbl_fp)
             rl.addLayout(v_info, 1)
@@ -1505,7 +1525,7 @@ class MainWindow(QMainWindow):
             sz = DiskSensor.get_real_directory_size(d)
             sz_str = f"{sz / (1024**3):.2f} GB" if sz > 1024**3 else f"{sz / (1024**2):.1f} MB"
             lbl_sz = QLabel(sz_str)
-            lbl_sz.setStyleSheet("font-size: 12px; font-weight: bold; font-family: 'Geist Mono'; color: #7C3AED;")
+            lbl_sz.setStyleSheet("font-size: 12px; font-weight: bold; font-family: Menlo; color: #7C3AED;")
             rl.addWidget(lbl_sz)
 
             btn_open = CapsuleButton("在访达查看", variant="pill_gray")
@@ -1533,12 +1553,17 @@ class MainWindow(QMainWindow):
 
     # ==================== 扫描与真实数据刷新 ====================
     def _start_scan(self):
+        if self.worker is not None and self.worker.isRunning():
+            return  # 已经在扫描中，绝不重复启动以免线程竞争与GC异常
+
         self.lbl_status.setText("● 正在回溯全盘真实时间点写入事件...")
         self.lbl_status.setStyleSheet("color: #7C3AED; font-size: 11px; font-weight: 500;")
         
-        self.worker = ScannerWorker()
+        self.worker = ScannerWorker(self)
+        _ACTIVE_WORKERS.add(self.worker)
         self.worker.time_events_ready.connect(self._on_time_events_early)
         self.worker.finished_scan.connect(self._on_scan_finished)
+        self.worker.finished.connect(lambda w=self.worker: _ACTIVE_WORKERS.discard(w))
         self.worker.start()
 
     def _on_time_events_early(self, time_events: List[TimeGrowthEvent]):
@@ -1632,7 +1657,7 @@ class MainWindow(QMainWindow):
             # 1. 精确发生时间点
             t_item = QTableWidgetItem(ev.datetime_str)
             t_item.setTextAlignment(Qt.AlignCenter)
-            t_item.setFont(QFont("Geist Mono", 10, QFont.Bold))
+            t_item.setFont(QFont("Menlo", 10, QFont.Bold))
             self.table.setItem(row, 0, t_item)
 
             # 2. 相对时间
@@ -1645,7 +1670,7 @@ class MainWindow(QMainWindow):
             # 3. 增量大小
             sz_item = QTableWidgetItem(ev.size_formatted)
             sz_item.setTextAlignment(Qt.AlignCenter)
-            sz_item.setFont(QFont("Geist Mono", 10, QFont.Bold))
+            sz_item.setFont(QFont("Menlo", 10, QFont.Bold))
             if ev.size_bytes > 500 * 1024 * 1024:
                 sz_item.setForeground(QColor("#DC2626"))
             elif ev.size_bytes > 50 * 1024 * 1024:
@@ -1665,7 +1690,7 @@ class MainWindow(QMainWindow):
             lbl_fname = QLabel(ev.file_name)
             lbl_fname.setStyleSheet("font-weight: bold; font-size: 12px; color: #111318;")
             lbl_path = QLabel(ev.path)
-            lbl_path.setStyleSheet(f"color: {THEME.TEXT_MUTED}; font-size: 10px; font-family: 'Geist Mono';")
+            lbl_path.setStyleSheet(f"color: {THEME.TEXT_MUTED}; font-size: 10px; font-family: Menlo;")
             p_l.addWidget(lbl_fname)
             p_l.addWidget(lbl_path)
             self.table.setCellWidget(row, 4, p_widget)
@@ -1765,14 +1790,14 @@ class MainWindow(QMainWindow):
             info_v.addWidget(lbl_d)
 
             lbl_p = QLabel(f"路径: {it.path}")
-            lbl_p.setStyleSheet(f"color: {THEME.TEXT_HINT}; font-size: 10px; font-family: 'Geist Mono';")
+            lbl_p.setStyleSheet(f"color: {THEME.TEXT_HINT}; font-size: 10px; font-family: Menlo;")
             lbl_p.setWordWrap(True)
             info_v.addWidget(lbl_p)
             c_l.addLayout(info_v, 1)
 
             # 大小
             lbl_sz = QLabel(it.size_formatted)
-            lbl_sz.setStyleSheet("font-size: 14px; font-weight: bold; font-family: 'Geist Mono'; color: #111318;")
+            lbl_sz.setStyleSheet("font-size: 14px; font-weight: bold; font-family: Menlo; color: #111318;")
             c_l.addWidget(lbl_sz)
 
             btn_reveal = CapsuleButton("在访达查看", variant="pill_gray")
@@ -1897,7 +1922,12 @@ class MainWindow(QMainWindow):
     def closeEvent(self, event):
         if hasattr(self, "inspection_timer") and self.inspection_timer.isActive():
             self.inspection_timer.stop()
-        if hasattr(self, "worker") and self.worker.isRunning():
-            self.worker.quit()
-            self.worker.wait(1000)
-        super().closeEvent(event)
+        if hasattr(self, "worker") and self.worker is not None:
+            if self.worker.isRunning():
+                self.worker.cancel()
+                self.worker.requestInterruption()
+                self.worker.quit()
+                if not self.worker.wait(300):
+                    self.worker.terminate()
+                    self.worker.wait(150)
+        event.accept()

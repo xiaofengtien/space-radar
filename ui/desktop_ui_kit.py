@@ -82,7 +82,7 @@ class CapsuleButton(QPushButton):
         self.setCursor(Qt.PointingHandCursor)
         self.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Fixed)
         
-        font = QFont("Geist", 10)
+        font = QFont(".AppleSystemUIFont", 10)
         font.setWeight(QFont.DemiBold)
         self.setFont(font)
         fm = QFontMetrics(font)
@@ -464,7 +464,7 @@ class PosterCard(QFrame):
         lbl_sub.setWordWrap(False)
         
         lbl_size = QLabel(size_str)
-        lbl_size.setStyleSheet("background-color: rgba(0, 0, 0, 0.55); color: #FFFFFF; font-size: 10px; font-weight: bold; padding: 2px 6px; border-radius: 4px; font-family: 'Geist Mono', monospace; border: none;")
+        lbl_size.setStyleSheet("background-color: rgba(0, 0, 0, 0.55); color: #FFFFFF; font-size: 10px; font-weight: bold; padding: 2px 6px; border-radius: 4px; font-family: Menlo; border: none;")
         
         btm_h.addWidget(lbl_sub, 1)
         btm_h.addWidget(lbl_size, 0)
@@ -519,7 +519,7 @@ class DockTabItem(QFrame):
         layout.setSpacing(6)
 
         self.lbl = QLabel(name)
-        font = QFont("Geist", 10)
+        font = QFont(".AppleSystemUIFont", 10)
         font.setWeight(QFont.DemiBold)
         self.lbl.setFont(font)
         layout.addWidget(self.lbl)
