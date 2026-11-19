@@ -33,8 +33,16 @@ jobs:
           pyinstaller packaging/windows/spaceradar.spec
 
       - name: 使用 NSIS 编译生成现代化安装程序
+        shell: cmd
         run: |
-          makensis packaging/windows/installer.nsi
+          if exist "C:\Program Files (x86)\NSIS\makensis.exe" (
+            "C:\Program Files (x86)\NSIS\makensis.exe" packaging/windows/installer.nsi
+          ) else if exist "C:\Program Files\NSIS\makensis.exe" (
+            "C:\Program Files\NSIS\makensis.exe" packaging/windows/installer.nsi
+          ) else (
+            choco install nsis -y
+            "C:\Program Files (x86)\NSIS\makensis.exe" packaging/windows/installer.nsi
+          )
 
       - name: 上传构建产物 (Artifact)
         uses: actions/upload-artifact@v4
