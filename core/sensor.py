@@ -324,41 +324,144 @@ class DiskSensor:
             return []
 
     @classmethod
-    def scan_all_time_point_events(cls) -> List[TimeGrowthEvent]:
-        """按时间戳扫描真实增长事件，涵盖自定义监控目录"""
-        events: List[TimeGrowthEvent] = []
+    def identify_file_context(cls, fp: str) -> Tuple[str, str, SafetyLevel, str]:
+        """
+        根据文件路径智能识别所属软件、分类、安全级别和图标
+        返回: (app_name, category, safety_level, icon_symbol)
+        """
+        p = Path(fp)
+        parts = p.parts
+        parts_lower = [x.lower() for x in parts]
+
+        if "downloads" in parts_lower or "下载" in parts_lower:
+            return "访达下载" if sys.platform == "darwin" else "下载文件夹", "downloads", SafetyLevel.CONFIRM, "📦"
+
+        if "jianyingpro" in parts_lower or "jianying" in parts_lower:
+            return "剪映 (CapCut)", "media", SafetyLevel.SAFE, "🎬"
+
+        if ".cargo" in parts_lower or "cargo" in parts_lower:
+            return "Cargo构建", "dev", SafetyLevel.SAFE, "🦀"
+
+        if ".cache" in parts_lower:
+            return "AI与工具缓存", "ai", SafetyLevel.SAFE, "🤖"
+
+        # Caches 目录智能识别
+        if "caches" in parts_lower or "cache" in parts_lower:
+            for part in parts:
+                low = part.lower()
+                if "antigravity" in low:
+                    return "Antigravity 更新", "ai", SafetyLevel.SAFE, "⚡️"
+                if "chrome" in low or part == "Google":
+                    return "Chrome 浏览器", "browser", SafetyLevel.SAFE, "🌐"
+                if "dingtalk" in low:
+                    return "钉钉缓存", "social", SafetyLevel.SAFE, "📌"
+                if "wechat" in low or "xinwechat" in low:
+                    return "微信临时缓存", "social", SafetyLevel.SAFE, "💬"
+                if "vscode" in low or ("code" in low and "microsoft" in low):
+                    return "VS Code", "dev", SafetyLevel.SAFE, "💻"
+                if "cursor" in low:
+                    return "Cursor 编辑器", "dev", SafetyLevel.SAFE, "💻"
+                if "netease" in low or "163music" in low:
+                    return "网易云音乐", "media", SafetyLevel.SAFE, "🎵"
+                if "raycast" in low:
+                    return "Raycast", "tool", SafetyLevel.SAFE, "⚡️"
+                if "homebrew" in low:
+                    return "Homebrew", "dev", SafetyLevel.SAFE, "🍺"
+                if "safari" in low:
+                    return "Safari 缓存", "browser", SafetyLevel.SAFE, "🧭"
+                if "edge" in low:
+                    return "Edge 浏览器", "browser", SafetyLevel.SAFE, "🌊"
+                if "codex" in low:
+                    return "Codex 运行缓存", "ai", SafetyLevel.SAFE, "🤖"
+                if "apple" in low:
+                    return "macOS 系统缓存", "system", SafetyLevel.SAFE, "🍎"
+                if low.startswith("com."):
+                    clean_name = part.replace("com.", "").split(".")[-1].capitalize()
+                    return f"{clean_name} 缓存", "app", SafetyLevel.SAFE, "📁"
+            return "应用运行时缓存", "app", SafetyLevel.SAFE, "📁"
+
+        # Windows Temp
+        if "temp" in parts_lower:
+            return "系统临时文件 (Temp)", "system", SafetyLevel.SAFE, "🧹"
+
+        return "本地文件变更", "custom", SafetyLevel.CONFIRM, "📁"
+
+    @classmethod
+    def get_realtime_watch_directories(cls) -> List[str]:
+        """获取需要接入文件系统秒级实时监听的活跃根目录列表"""
         home = Path.home()
+        dirs = []
+        if sys.platform == "darwin":
+            dirs = [
+                home / "Downloads",
+                home / "Library/Caches",
+                home / ".cache",
+                home / "Movies/JianyingPro",
+            ]
+        else:
+            local_appdata = os.environ.get("LOCALAPPDATA", str(home / "AppData/Local"))
+            dirs = [
+                home / "Downloads",
+                Path(local_appdata) / "Temp",
+                home / ".cache",
+            ]
 
-        targets = [
-            (home / "Downloads", "downloads", "访达下载", SafetyLevel.CONFIRM, "📦", 2 * 1024 * 1024),
-            (home / "Movies/JianyingPro", "media", "剪映 (CapCut)", SafetyLevel.SAFE, "🎬", 5 * 1024 * 1024),
-            (home / "Library/Containers/com.tencent.xinWeChat/Data/Library/Caches", "social", "微信临时缓存", SafetyLevel.SAFE, "💬", 2 * 1024 * 1024),
-            (home / "Library/Caches/com.alibaba.DingTalkMac", "social", "钉钉缓存", SafetyLevel.SAFE, "📌", 5 * 1024 * 1024),
-            (home / ".cargo", "dev", "Cargo构建", SafetyLevel.SAFE, "🦀", 10 * 1024 * 1024),
-            (home / ".cache", "ai", "AI与工具缓存", SafetyLevel.SAFE, "🤖", 5 * 1024 * 1024),
-        ]
-
-        # 挂载用户自定义目录
+        # 挂载用户自定义监控目录
         for c_dir in ConfigManager.get_custom_directories():
             p_obj = Path(c_dir)
             if p_obj.exists():
-                folder_name = p_obj.name
-                targets.append((p_obj, "custom", f"自定义({folder_name})", SafetyLevel.CONFIRM, "📁", 5 * 1024 * 1024))
+                dirs.append(p_obj)
 
-        for p, cat, app, safety, icon, min_sz in targets:
+        return [str(d) for d in dirs if d.exists()]
+
+    @classmethod
+    def scan_all_time_point_events(cls) -> List[TimeGrowthEvent]:
+        """按时间戳全量扫描真实增长事件，涵盖各主流应用缓存、下载与自定义监控目录"""
+        events: List[TimeGrowthEvent] = []
+        home = Path.home()
+
+        targets: List[Tuple[Path, int]] = []
+        if sys.platform == "darwin":
+            targets = [
+                (home / "Downloads", 300 * 1024),  # >=300KB 的下载内容（捕捉安装包、Zip、大图）
+                (home / "Library/Caches", 1024 * 1024),  # >=1MB 应用与系统缓存（Chrome、Antigravity、Raycast 等）
+                (home / "Library/Containers/com.tencent.xinWeChat/Data/Library/Caches", 500 * 1024),
+                (home / "Movies/JianyingPro", 2 * 1024 * 1024),
+                (home / ".cache", 1024 * 1024),
+                (home / ".cargo", 3 * 1024 * 1024),
+            ]
+        else:
+            local_appdata = os.environ.get("LOCALAPPDATA", str(home / "AppData/Local"))
+            targets = [
+                (home / "Downloads", 300 * 1024),
+                (Path(local_appdata) / "Temp", 1024 * 1024),
+                (Path(local_appdata) / "Google/Chrome/User Data/Default/Cache", 1024 * 1024),
+                (Path(local_appdata) / "Microsoft/Edge/User Data/Default/Cache", 1024 * 1024),
+                (home / ".cache", 1024 * 1024),
+                (home / ".cargo", 3 * 1024 * 1024),
+            ]
+
+        # 挂载用户自定义监控目录
+        for c_dir in ConfigManager.get_custom_directories():
+            p_obj = Path(c_dir)
+            if p_obj.exists():
+                targets.append((p_obj, 500 * 1024))
+
+        for p, min_sz in targets:
             if not p.exists():
                 continue
             try:
-                for root, dirs, files in os.walk(p):
+                for root, dirs, files in os.walk(p, onerror=lambda err: None):
                     for f in files:
                         fp = os.path.join(root, f)
                         try:
                             st = os.stat(fp)
                             if st.st_size >= min_sz:
+                                app_name, cat, safety, icon = cls.identify_file_context(fp)
                                 ev = TimeGrowthEvent.from_file_stat(
                                      fp=fp,
                                      st=st,
-                                     app_name=app,
+                                     app_name=app_name,
                                      category=cat,
                                      safety=safety,
                                      icon=icon
@@ -389,7 +492,7 @@ class DiskSensor:
                     "safety": e.safety.value,
                     "icon_symbol": e.icon_symbol
                 }
-                for e in events[:300]
+                for e in events[:500]
             ]
             with open(cache_path, "w", encoding="utf-8") as f:
                 json.dump(dump_list, f, ensure_ascii=False)

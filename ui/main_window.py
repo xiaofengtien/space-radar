@@ -33,6 +33,7 @@ from core.sensor import DiskSensor, DiskVolumeInfo
 from core.cleaner import SafeCleaner
 from core.classifier import GrowthItem, SafetyLevel, TimeGrowthEvent
 from core.config import ConfigManager
+from core.watcher import RealtimeWatcher
 
 _ACTIVE_WORKERS = set()
 
@@ -226,6 +227,7 @@ class MainWindow(QMainWindow):
             self.lbl_metric_recent_size.setText(latest.size_formatted)
             self.lbl_metric_recent_time.setText(f"{latest.relative_time_str} · {latest.app_name}")
         self._setup_inspection_timer()
+        self._setup_realtime_watcher()
         self._start_scan()
 
     def _setup_ui(self):
@@ -1041,6 +1043,53 @@ class MainWindow(QMainWindow):
         self.inspection_timer.setInterval(1000)
         self.inspection_timer.timeout.connect(self._on_inspection_tick)
         self.inspection_timer.start()
+
+    def _setup_realtime_watcher(self):
+        """配置并启动系统底层秒级文件写入监听器 (基于 FSEvents / ReadDirectoryChangesW)"""
+        self._pending_realtime_events: List[TimeGrowthEvent] = []
+        self._realtime_debounce_timer = QTimer(self)
+        self._realtime_debounce_timer.setSingleShot(True)
+        self._realtime_debounce_timer.setInterval(300)
+        self._realtime_debounce_timer.timeout.connect(self._flush_realtime_events)
+
+        self.realtime_watcher = RealtimeWatcher(self)
+        self.realtime_watcher.realtime_event_captured.connect(self._on_realtime_event)
+        self.realtime_watcher.start()
+
+    def _on_realtime_event(self, ev: TimeGrowthEvent):
+        """后台线程捕获到文件写入，调度到主线程防抖队列"""
+        self._pending_realtime_events.append(ev)
+        if not self._realtime_debounce_timer.isActive():
+            self._realtime_debounce_timer.start()
+
+    def _flush_realtime_events(self):
+        """防抖批量处理实时新写入事件，保持界面流畅无卡顿"""
+        if not self._pending_realtime_events:
+            return
+        new_batch = self._pending_realtime_events[:]
+        self._pending_realtime_events.clear()
+
+        existing_keys = {(e.path, round(e.timestamp, 1)) for e in self.time_events}
+        filtered = [e for e in new_batch if (e.path, round(e.timestamp, 1)) not in existing_keys]
+        if not filtered:
+            return
+
+        filtered.sort(key=lambda x: x.timestamp, reverse=True)
+        for ev in reversed(filtered):
+            self.time_events.insert(0, ev)
+
+        if len(self.time_events) > 1000:
+            self.time_events = self.time_events[:1000]
+
+        # 刷新时间流水表格
+        self._populate_time_table()
+
+        # 实时更新 HUD 与顶部指标
+        latest = filtered[0]
+        self.lbl_metric_recent_size.setText(latest.size_formatted)
+        self.lbl_metric_recent_time.setText(f"刚刚写入 · {latest.app_name}")
+        self.lbl_status.setText(f"● 实时捕获新写入: {latest.size_formatted} · {latest.app_name} ({latest.file_name[:20]})")
+        self.lbl_status.setStyleSheet("color: #10B981; font-size: 11px; font-weight: 500;")
 
     def _on_inspection_tick(self):
         if not ConfigManager.load().get("auto_inspection_enabled", True):
@@ -1944,6 +1993,11 @@ class MainWindow(QMainWindow):
             self.table.setRowHeight(row, 52)
 
     def closeEvent(self, event):
+        if hasattr(self, "realtime_watcher") and self.realtime_watcher:
+            try:
+                self.realtime_watcher.stop()
+            except Exception:
+                pass
         if hasattr(self, "inspection_timer") and self.inspection_timer.isActive():
             self.inspection_timer.stop()
         if hasattr(self, "worker") and self.worker is not None:

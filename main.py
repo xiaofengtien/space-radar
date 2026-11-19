@@ -72,6 +72,11 @@ def main():
     setup_macos_app_identity(BRAND.WINDOW_TITLE, BRAND.NAME)
 
     exit_code = app.exec()
+    if hasattr(window, "realtime_watcher") and window.realtime_watcher:
+        try:
+            window.realtime_watcher.stop()
+        except Exception:
+            pass
     if hasattr(window, "worker") and window.worker and window.worker.isRunning():
         try:
             window.worker.cancel()
