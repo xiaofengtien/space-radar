@@ -36,12 +36,12 @@ jobs:
         shell: cmd
         run: |
           if exist "C:\Program Files (x86)\NSIS\makensis.exe" (
-            "C:\Program Files (x86)\NSIS\makensis.exe" packaging/windows/installer.nsi
+            "C:\Program Files (x86)\NSIS\makensis.exe" -INPUTCHARSET UTF8 packaging/windows/installer.nsi
           ) else if exist "C:\Program Files\NSIS\makensis.exe" (
-            "C:\Program Files\NSIS\makensis.exe" packaging/windows/installer.nsi
+            "C:\Program Files\NSIS\makensis.exe" -INPUTCHARSET UTF8 packaging/windows/installer.nsi
           ) else (
             choco install nsis -y
-            "C:\Program Files (x86)\NSIS\makensis.exe" packaging/windows/installer.nsi
+            "C:\Program Files (x86)\NSIS\makensis.exe" -INPUTCHARSET UTF8 packaging/windows/installer.nsi
           )
 
       - name: 上传构建产物 (Artifact)

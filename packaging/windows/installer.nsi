@@ -1,3 +1,5 @@
+﻿Unicode true
+
 ; ============================================================================
 ; SpaceRadar · 空间雷达 - NSIS 现代化安装引导程序脚本 (MUI2)
 ; 支持 x64 Windows 10 / 11 原生安装、桌面与开始菜单快捷方式、完整卸载与注册表登记
@@ -30,8 +32,7 @@ InstallDirRegKey ${PRODUCT_UNINST_ROOT_KEY} "${PRODUCT_DIR_REGKEY}" ""
 
 ; 采用 LZMA 极限高压缩比，大幅降低安装包体积
 SetCompressor /SOLID lzma
-RequestExecutionLevel user ; 普通用户权限即可运行与安装（无需强求管理员权限）
-Unicode true
+RequestExecutionLevel user
 
 ; -----------------------------
 ; 界面与图标资源
@@ -43,16 +44,11 @@ Unicode true
 ; -----------------------------
 ; 安装向导页面定义 (Modern UI 2)
 ; -----------------------------
-; 1. 欢迎页
 !insertmacro MUI_PAGE_WELCOME
-
-; 2. 安装目录选择页
 !insertmacro MUI_PAGE_DIRECTORY
-
-; 3. 正在安装过程页
 !insertmacro MUI_PAGE_INSTFILES
 
-; 4. 安装完成页 (支持直接勾选运行程序)
+; 安装完成页 (支持直接勾选运行程序)
 !define MUI_FINISHPAGE_RUN "$INSTDIR\SpaceRadar.exe"
 !define MUI_FINISHPAGE_RUN_TEXT "立即运行 ${PRODUCT_DISPLAY_NAME}"
 !insertmacro MUI_PAGE_FINISH
@@ -65,7 +61,7 @@ Unicode true
 !insertmacro MUI_UNPAGE_FINISH
 
 ; -----------------------------
-; 多语言支持 (默认简体中文)
+; 多语言支持配置 (规范：必须置于所有 MUI_PAGE 之后！)
 ; -----------------------------
 !insertmacro MUI_LANGUAGE "SimpChinese"
 !insertmacro MUI_LANGUAGE "English"
