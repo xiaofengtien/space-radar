@@ -9,8 +9,17 @@ import os
 if sys.platform == "darwin" and os.path.basename(sys.executable) != "SpaceRadar":
     _bin = os.path.join(os.path.dirname(sys.executable), "SpaceRadar")
     try:
-        if not os.path.exists(_bin):
-            os.symlink(sys.executable, _bin)
+        # 必须是实体文件（非软链接），macOS 内核与 Dock 才会将进程名彻底认作 SpaceRadar
+        if not os.path.exists(_bin) or os.path.islink(_bin):
+            if os.path.islink(_bin):
+                try:
+                    os.unlink(_bin)
+                except Exception:
+                    pass
+            import shutil
+            real_py = os.path.realpath(sys.executable)
+            shutil.copy2(real_py, _bin)
+            os.chmod(_bin, 0o755)
         if os.path.exists(_bin) and os.access(_bin, os.X_OK):
             os.execv(_bin, [_bin] + sys.argv)
     except Exception:
