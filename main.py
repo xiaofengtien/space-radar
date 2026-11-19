@@ -3,6 +3,18 @@
 """
 import sys
 import os
+
+# macOS 原生 Dock 品牌保护：当作为普通 python 脚本被调用时，瞬时切入产品专属二进制名
+# 确保 macOS WindowServer / LaunchServices 彻底将进程标识为 SpaceRadar，消除 python3.12 气泡提示
+if sys.platform == "darwin" and os.path.basename(sys.executable) != "SpaceRadar":
+    _bin = os.path.join(os.path.dirname(sys.executable), "SpaceRadar")
+    try:
+        if not os.path.exists(_bin):
+            os.symlink(sys.executable, _bin)
+        if os.path.exists(_bin) and os.access(_bin, os.X_OK):
+            os.execv(_bin, [_bin] + sys.argv)
+    except Exception:
+        pass
 from PySide6.QtWidgets import QApplication
 from PySide6.QtGui import QFont, QFontDatabase, QIcon
 from PySide6.QtCore import Qt
