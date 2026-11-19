@@ -16,7 +16,7 @@ from datetime import datetime
 from pathlib import Path
 
 from PySide6.QtCore import Qt, QTimer, QThread, Signal
-from PySide6.QtGui import QFont, QColor, QFontMetrics
+from PySide6.QtGui import QFont, QColor, QFontMetrics, QIcon, QPixmap
 from PySide6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit,
     QScrollArea, QGridLayout, QFrame, QSizePolicy, QMessageBox, QStackedWidget,
@@ -72,6 +72,9 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle(BRAND.WINDOW_TITLE)
+        icon_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "assets", "app_icon_128.png")
+        if os.path.exists(icon_path):
+            self.setWindowIcon(QIcon(icon_path))
         self.resize(1140, 820)
         self.setMinimumSize(1020, 680)
         self.setStyleSheet(f"""
@@ -304,10 +307,17 @@ class MainWindow(QMainWindow):
         layout.setContentsMargins(18, 0, 18, 0)
         layout.setSpacing(10)
 
-        b_box = QLabel(BRAND.LOGO_TAG)
-        b_box.setFixedSize(22, 22)
-        b_box.setAlignment(Qt.AlignCenter)
-        b_box.setStyleSheet("background-color: #111318; color: #FFFFFF; font-weight: bold; font-size: 11px; border-radius: 4px;")
+        b_box = QLabel()
+        b_box.setFixedSize(24, 24)
+        ico_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "assets", "app_icon_64.png")
+        if os.path.exists(ico_path):
+            pix = QPixmap(ico_path).scaled(24, 24, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+            b_box.setPixmap(pix)
+            b_box.setStyleSheet("border-radius: 5px;")
+        else:
+            b_box.setText(BRAND.LOGO_TAG)
+            b_box.setAlignment(Qt.AlignCenter)
+            b_box.setStyleSheet("background-color: #111318; color: #FFFFFF; font-weight: bold; font-size: 11px; border-radius: 5px;")
         layout.addWidget(b_box)
 
         lbl_b_name = QLabel(f"{BRAND.NAME} · {BRAND.NAME_CN}")
@@ -1411,18 +1421,32 @@ class MainWindow(QMainWindow):
 
         # 3. 关于 SpaceRadar
         about_card = Card()
-        ac_layout = QVBoxLayout(about_card)
-        ac_layout.setContentsMargins(24, 18, 24, 18)
-        ac_layout.setSpacing(8)
+        ac_layout = QHBoxLayout(about_card)
+        ac_layout.setContentsMargins(24, 20, 24, 20)
+        ac_layout.setSpacing(18)
 
-        lbl_ab_t = QLabel(f"关于 {BRAND.NAME} · {BRAND.NAME_CN}")
-        lbl_ab_t.setFont(QFont(".AppleSystemUIFont", 13, QFont.Bold))
+        lbl_ab_ico = QLabel()
+        lbl_ab_ico.setFixedSize(60, 60)
+        ico_large = os.path.join(os.path.dirname(os.path.dirname(__file__)), "assets", "app_icon_128.png")
+        if os.path.exists(ico_large):
+            lbl_ab_ico.setPixmap(QPixmap(ico_large).scaled(60, 60, Qt.KeepAspectRatio, Qt.SmoothTransformation))
+        else:
+            lbl_ab_ico.setText("S.")
+            lbl_ab_ico.setAlignment(Qt.AlignCenter)
+            lbl_ab_ico.setStyleSheet("background: #111318; color: #fff; font-size: 22px; font-weight: bold; border-radius: 12px;")
+        ac_layout.addWidget(lbl_ab_ico)
+
+        ac_v = QVBoxLayout()
+        ac_v.setSpacing(4)
+        lbl_ab_t = QLabel(f"{BRAND.NAME} · {BRAND.NAME_CN}")
+        lbl_ab_t.setFont(QFont(".AppleSystemUIFont", 15, QFont.Bold))
         lbl_ab_t.setStyleSheet(f"color: {THEME.TEXT_MAIN};")
-        ac_layout.addWidget(lbl_ab_t)
+        ac_v.addWidget(lbl_ab_t)
 
-        lbl_ab_d = QLabel(f"版本: v{BRAND.VERSION} · {BRAND.TAGLINE}\n运行平台: macOS 原生 (支持 FSEvents / APFS 本地快照 / du-sk 极速探测)")
+        lbl_ab_d = QLabel(f"版本: v{BRAND.VERSION} · {BRAND.TAGLINE}\n运行平台: macOS 原生 (支持 FSEvents / APFS 本地快照 / du-sk 极速归因探测)")
         lbl_ab_d.setStyleSheet(f"color: {THEME.TEXT_MUTED}; font-size: 12px; line-height: 1.6;")
-        ac_layout.addWidget(lbl_ab_d)
+        ac_v.addWidget(lbl_ab_d)
+        ac_layout.addLayout(ac_v, 1)
 
         layout.addWidget(about_card)
 

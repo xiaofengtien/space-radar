@@ -4,7 +4,7 @@
 import sys
 import os
 from PySide6.QtWidgets import QApplication
-from PySide6.QtGui import QFont, QFontDatabase
+from PySide6.QtGui import QFont, QFontDatabase, QIcon
 from PySide6.QtCore import Qt
 
 from brand import BRAND
@@ -17,6 +17,10 @@ def main():
     app = QApplication(sys.argv)
     app.setApplicationName(BRAND.NAME)
     app.setApplicationDisplayName(BRAND.WINDOW_TITLE)
+
+    icon_path = os.path.join(os.path.dirname(__file__), "assets", "app_icon_128.png")
+    if os.path.exists(icon_path):
+        app.setWindowIcon(QIcon(icon_path))
 
     # 全局样式干净重置：消除 macOS Aqua 原生按钮灰框与 QLabel 默认边框
     app.setStyleSheet("""
