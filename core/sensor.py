@@ -345,18 +345,26 @@ class DiskSensor:
         if ".cache" in parts_lower:
             return "AI与工具缓存", "ai", SafetyLevel.SAFE, "🤖"
 
-        # Caches 目录智能识别
-        if "caches" in parts_lower or "cache" in parts_lower:
+        # Application Support, Logs 与 Caches 目录智能识别
+        if any(x in parts_lower for x in ("application support", "logs", "caches", "cache")):
             for part in parts:
                 low = part.lower()
                 if "antigravity" in low:
-                    return "Antigravity 更新", "ai", SafetyLevel.SAFE, "⚡️"
+                    return "Antigravity 运行时", "ai", SafetyLevel.SAFE, "⚡️"
                 if "chrome" in low or part == "Google":
                     return "Chrome 浏览器", "browser", SafetyLevel.SAFE, "🌐"
                 if "dingtalk" in low:
-                    return "钉钉缓存", "social", SafetyLevel.SAFE, "📌"
+                    return "钉钉数据与日志", "social", SafetyLevel.SAFE, "📌"
                 if "wechat" in low or "xinwechat" in low:
-                    return "微信临时缓存", "social", SafetyLevel.SAFE, "💬"
+                    return "微信数据缓存", "social", SafetyLevel.SAFE, "💬"
+                if "telegram" in low:
+                    return "Telegram 日志", "social", SafetyLevel.SAFE, "✈️"
+                if "notion" in low:
+                    return "Notion 数据库", "tool", SafetyLevel.SAFE, "📝"
+                if "quark" in low:
+                    return "夸克存储", "tool", SafetyLevel.SAFE, "📦"
+                if "macperformance" in low:
+                    return "系统性能监视器", "system", SafetyLevel.SAFE, "📊"
                 if "vscode" in low or ("code" in low and "microsoft" in low):
                     return "VS Code", "dev", SafetyLevel.SAFE, "💻"
                 if "cursor" in low:
@@ -364,7 +372,7 @@ class DiskSensor:
                 if "netease" in low or "163music" in low:
                     return "网易云音乐", "media", SafetyLevel.SAFE, "🎵"
                 if "raycast" in low:
-                    return "Raycast", "tool", SafetyLevel.SAFE, "⚡️"
+                    return "Raycast 数据", "tool", SafetyLevel.SAFE, "⚡️"
                 if "homebrew" in low:
                     return "Homebrew", "dev", SafetyLevel.SAFE, "🍺"
                 if "safari" in low:
@@ -374,10 +382,12 @@ class DiskSensor:
                 if "codex" in low:
                     return "Codex 运行缓存", "ai", SafetyLevel.SAFE, "🤖"
                 if "apple" in low:
-                    return "macOS 系统缓存", "system", SafetyLevel.SAFE, "🍎"
+                    return "macOS 系统数据", "system", SafetyLevel.SAFE, "🍎"
                 if low.startswith("com."):
                     clean_name = part.replace("com.", "").split(".")[-1].capitalize()
-                    return f"{clean_name} 缓存", "app", SafetyLevel.SAFE, "📁"
+                    return f"{clean_name} 应用数据", "app", SafetyLevel.SAFE, "📁"
+            if "logs" in parts_lower:
+                return "应用运行日志", "dev", SafetyLevel.SAFE, "📄"
             return "应用运行时缓存", "app", SafetyLevel.SAFE, "📁"
 
         # Windows Temp
@@ -419,6 +429,8 @@ class DiskSensor:
         if sys.platform == "darwin":
             targets = [
                 (home / "Downloads", 300 * 1024),  # >=300KB 的下载内容（捕捉安装包、Zip、大图）
+                (home / "Library/Logs", 300 * 1024),  # >=300KB 的应用日志（Notion, DingTalk, Telegram 等）
+                (home / "Library/Application Support", 1024 * 1024),  # >=1MB 应用数据
                 (home / "Library/Caches", 1024 * 1024),  # >=1MB 应用与系统缓存（Chrome、Antigravity、Raycast 等）
                 (home / "Library/Containers/com.tencent.xinWeChat/Data/Library/Caches", 500 * 1024),
                 (home / "Movies/JianyingPro", 2 * 1024 * 1024),
@@ -427,11 +439,13 @@ class DiskSensor:
             ]
         else:
             local_appdata = os.environ.get("LOCALAPPDATA", str(home / "AppData/Local"))
+            appdata = os.environ.get("APPDATA", str(home / "AppData/Roaming"))
             targets = [
                 (home / "Downloads", 300 * 1024),
                 (Path(local_appdata) / "Temp", 1024 * 1024),
                 (Path(local_appdata) / "Google/Chrome/User Data/Default/Cache", 1024 * 1024),
                 (Path(local_appdata) / "Microsoft/Edge/User Data/Default/Cache", 1024 * 1024),
+                (Path(appdata), 1024 * 1024),
                 (home / ".cache", 1024 * 1024),
                 (home / ".cargo", 3 * 1024 * 1024),
             ]

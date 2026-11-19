@@ -12,7 +12,7 @@ import os
 import sys
 import time
 from typing import List, Dict, Any, Optional
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 
 from PySide6.QtCore import Qt, QTimer, QThread, Signal
@@ -1717,11 +1717,24 @@ class MainWindow(QMainWindow):
         self._refresh_clean_hub(items)
 
     def _populate_time_table(self):
-        """按选中的时间范围过滤并渲染表格 (限制渲染前 100 条以保持极致 60fps 流畅度)"""
+        """按选中的时间范围动态计算并渲染表格 (限制渲染前 100 条以保持极致 60fps 流畅度)"""
+        now = time.time()
         if self.current_time_filter == "all":
             filtered = self.time_events
+        elif self.current_time_filter == "1h":
+            filtered = [e for e in self.time_events if (now - e.timestamp) <= 3600]
+        elif self.current_time_filter == "today":
+            today_date = datetime.now().date()
+            filtered = [e for e in self.time_events if datetime.fromtimestamp(e.timestamp).date() == today_date]
+        elif self.current_time_filter == "yesterday":
+            yesterday_date = datetime.now().date() - timedelta(days=1)
+            filtered = [e for e in self.time_events if datetime.fromtimestamp(e.timestamp).date() == yesterday_date]
+        elif self.current_time_filter == "7days":
+            filtered = [e for e in self.time_events if (now - e.timestamp) <= 7 * 86400]
+        elif self.current_time_filter == "older":
+            filtered = [e for e in self.time_events if (now - e.timestamp) > 7 * 86400]
         else:
-            filtered = [e for e in self.time_events if e.time_bucket == self.current_time_filter]
+            filtered = self.time_events
 
         # 核心性能优化：限制单屏表格渲染上限 100 条，杜绝大量 Qt setCellWidget 阻塞主线程
         MAX_DISPLAY = 100

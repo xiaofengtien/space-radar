@@ -15,7 +15,7 @@ class BrandConfig:
     LOGO_TAG: str = "S."
     # 副标题与标语
     TAGLINE: str = "Mac 磁盘增长时间点归因与一键瘦身"
-    VERSION: str = "1.0.0"
+    VERSION: str = "1.0.1"
     # 窗口标题展示
     WINDOW_TITLE: str = "SpaceRadar · 空间雷达"
 
