@@ -6,7 +6,7 @@ import os
 
 # macOS 原生 Dock 品牌保护：当作为普通 python 脚本被调用时，瞬时切入产品专属二进制名
 # 确保 macOS WindowServer / LaunchServices 彻底将进程标识为 SpaceRadar，消除 python3.12 气泡提示
-if sys.platform == "darwin" and os.path.basename(sys.executable) != "SpaceRadar":
+if sys.platform == "darwin" and not getattr(sys, "frozen", False) and os.path.basename(sys.executable) != "SpaceRadar":
     _bin = os.path.join(os.path.dirname(sys.executable), "SpaceRadar")
     try:
         # 必须是实体文件（非软链接），macOS 内核与 Dock 才会将进程名彻底认作 SpaceRadar
@@ -28,7 +28,7 @@ from PySide6.QtWidgets import QApplication
 from PySide6.QtGui import QFont, QFontDatabase, QIcon
 from PySide6.QtCore import Qt
 
-from brand import BRAND
+from brand import BRAND, get_asset_path
 from core.macos_compat import setup_macos_app_identity
 from ui.main_window import MainWindow
 
@@ -43,7 +43,7 @@ def main():
     app.setApplicationName(BRAND.NAME)
     app.setApplicationDisplayName(BRAND.WINDOW_TITLE)
 
-    icon_path = os.path.join(os.path.dirname(__file__), "assets", "app_icon_128.png")
+    icon_path = get_asset_path("app_icon_128.png")
     if os.path.exists(icon_path):
         app.setWindowIcon(QIcon(icon_path))
 

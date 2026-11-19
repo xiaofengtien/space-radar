@@ -24,7 +24,7 @@ from PySide6.QtWidgets import (
     QCheckBox
 )
 
-from brand import BRAND
+from brand import BRAND, get_asset_path
 from ui.theme import THEME
 from ui.desktop_ui_kit import (
     Card, HudCard, CapsuleButton, PosterCard, FloatingDock, ToggleSwitch, apply_soft_shadow
@@ -72,7 +72,7 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle(BRAND.WINDOW_TITLE)
-        icon_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "assets", "app_icon_128.png")
+        icon_path = get_asset_path("app_icon_128.png")
         if os.path.exists(icon_path):
             self.setWindowIcon(QIcon(icon_path))
         self.resize(1140, 820)
@@ -309,7 +309,7 @@ class MainWindow(QMainWindow):
 
         b_box = QLabel()
         b_box.setFixedSize(24, 24)
-        ico_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "assets", "app_icon_64.png")
+        ico_path = get_asset_path("app_icon_64.png")
         if os.path.exists(ico_path):
             pix = QPixmap(ico_path).scaled(24, 24, Qt.KeepAspectRatio, Qt.SmoothTransformation)
             b_box.setPixmap(pix)
@@ -1427,7 +1427,7 @@ class MainWindow(QMainWindow):
 
         lbl_ab_ico = QLabel()
         lbl_ab_ico.setFixedSize(60, 60)
-        ico_large = os.path.join(os.path.dirname(os.path.dirname(__file__)), "assets", "app_icon_128.png")
+        ico_large = get_asset_path("app_icon_128.png")
         if os.path.exists(ico_large):
             lbl_ab_ico.setPixmap(QPixmap(ico_large).scaled(60, 60, Qt.KeepAspectRatio, Qt.SmoothTransformation))
         else:
