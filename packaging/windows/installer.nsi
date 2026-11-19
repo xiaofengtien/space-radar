@@ -15,7 +15,7 @@
 !define PRODUCT_DISPLAY_NAME "SpaceRadar · 空间雷达"
 !define PRODUCT_VERSION "1.0.0"
 !define PRODUCT_PUBLISHER "SpaceRadar Team"
-!define PRODUCT_WEB_SITE "https://github.com/Aaron/space-radar"
+!define PRODUCT_WEB_SITE "https://github.com/xiaofengtien/space-radar"
 !define PRODUCT_DIR_REGKEY "Software\SpaceRadar"
 !define PRODUCT_UNINST_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\SpaceRadar"
 !define PRODUCT_UNINST_ROOT_KEY HKCU
