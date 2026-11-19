@@ -38,14 +38,14 @@ class _WatchdogHandler(FileSystemEventHandler if HAS_WATCHDOG else object):
                 return
 
             st = os.stat(src_path)
-            # 过滤小于 300KB 的微小写入，避免高频日志扰动
-            if st.st_size < 300 * 1024:
+            # 过滤小于 500KB 的微小写入，避免高频日志扰动
+            if st.st_size < 500 * 1024:
                 return
 
             now = time.time()
-            # 1.5 秒防抖（同文件在短时间内连续写入只上报一次最终态）
+            # 2.0 秒防抖（同文件在短时间内连续写入只上报一次最终态）
             if src_path in self._last_processed:
-                if now - self._last_processed[src_path] < 1.5:
+                if now - self._last_processed[src_path] < 2.0:
                     return
             self._last_processed[src_path] = now
 

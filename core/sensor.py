@@ -388,22 +388,17 @@ class DiskSensor:
 
     @classmethod
     def get_realtime_watch_directories(cls) -> List[str]:
-        """获取需要接入文件系统秒级实时监听的活跃根目录列表"""
+        """获取需要接入文件系统秒级实时监听的活跃根目录列表（仅监听高价值目录，绝对避开缓存风暴）"""
         home = Path.home()
         dirs = []
         if sys.platform == "darwin":
             dirs = [
                 home / "Downloads",
-                home / "Library/Caches",
-                home / ".cache",
                 home / "Movies/JianyingPro",
             ]
         else:
-            local_appdata = os.environ.get("LOCALAPPDATA", str(home / "AppData/Local"))
             dirs = [
                 home / "Downloads",
-                Path(local_appdata) / "Temp",
-                home / ".cache",
             ]
 
         # 挂载用户自定义监控目录
@@ -447,12 +442,23 @@ class DiskSensor:
             if p_obj.exists():
                 targets.append((p_obj, 500 * 1024))
 
+        ignored_subdirs = {"cache_data", "code cache", "graphitedawncache", "gpu_cache", "dawncache", "index-dir"}
+
         for p, min_sz in targets:
             if not p.exists():
                 continue
             try:
                 for root, dirs, files in os.walk(p, onerror=lambda err: None):
+                    # 快速剪枝：忽略浏览器内部碎片子目录，避免扫描陷入深渊
+                    dirs[:] = [d for d in dirs if d.lower() not in ignored_subdirs]
+                    rel = os.path.relpath(root, p)
+                    if rel != "." and len(Path(rel).parts) >= 4:
+                        dirs.clear()
+                        continue
+
                     for f in files:
+                        if f.startswith(".") or f.endswith(("_0", "_1", ".tmp", ".lock", ".ldb")):
+                            continue
                         fp = os.path.join(root, f)
                         try:
                             st = os.stat(fp)

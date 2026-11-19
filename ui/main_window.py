@@ -1717,16 +1717,22 @@ class MainWindow(QMainWindow):
         self._refresh_clean_hub(items)
 
     def _populate_time_table(self):
-        """按选中的时间范围过滤并渲染表格"""
+        """按选中的时间范围过滤并渲染表格 (限制渲染前 100 条以保持极致 60fps 流畅度)"""
         if self.current_time_filter == "all":
             filtered = self.time_events
         else:
             filtered = [e for e in self.time_events if e.time_bucket == self.current_time_filter]
 
-        self.table.setRowCount(len(filtered))
-        self.lbl_time_subtitle.setText(f"当前筛选显示 {len(filtered)} 起真实写入事件（按时间倒序排列）")
+        # 核心性能优化：限制单屏表格渲染上限 100 条，杜绝大量 Qt setCellWidget 阻塞主线程
+        MAX_DISPLAY = 100
+        display_events = filtered[:MAX_DISPLAY]
+        self.table.setRowCount(len(display_events))
+        if len(filtered) > MAX_DISPLAY:
+            self.lbl_time_subtitle.setText(f"当前筛选显示最新 {len(display_events)} 起写入事件（共扫描发现 {len(filtered)} 起，按时间倒序）")
+        else:
+            self.lbl_time_subtitle.setText(f"当前筛选显示 {len(filtered)} 起真实写入事件（按时间倒序排列）")
 
-        for row, ev in enumerate(filtered):
+        for row, ev in enumerate(display_events):
             # 1. 精确发生时间点
             t_item = QTableWidgetItem(ev.datetime_str)
             t_item.setTextAlignment(Qt.AlignCenter)
