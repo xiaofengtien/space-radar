@@ -70,6 +70,10 @@ RequestExecutionLevel user
 ; 主安装逻辑区段
 ; -----------------------------
 Section "MainSection" SEC01
+    ; 自动关闭可能处于运行或挂起状态的旧版本进程，防止文件被独占锁定
+    nsExec::Exec "taskkill /F /IM SpaceRadar.exe /T"
+    Sleep 500
+
     SetOutPath "$INSTDIR"
     SetOverwrite on
 
@@ -111,6 +115,9 @@ SectionEnd
 ; 卸载清理逻辑区段
 ; -----------------------------
 Section Uninstall
+    nsExec::Exec "taskkill /F /IM SpaceRadar.exe /T"
+    Sleep 500
+
     ; 删除快捷方式
     Delete "$DESKTOP\${PRODUCT_DISPLAY_NAME}.lnk"
     Delete "$SMPROGRAMS\${PRODUCT_DISPLAY_NAME}\${PRODUCT_DISPLAY_NAME}.lnk"
